@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 class MLP(nn.Module):
-    def __init__(self, input_size, num_classes, hidden_size1=219, hidden_size2=330,hidden_size3 = 219, hidden_size4 = 128):
+    def __init__(self, input_size, num_classes, hidden_size1=219, hidden_size2=438,hidden_size3 = 219, hidden_size4 = 128):
         super(MLP, self).__init__()
         self.layers = nn.Sequential(
             nn.Linear(input_size, hidden_size1),
