@@ -52,7 +52,7 @@ class AttentiveMLP(nn.Module):
 
         attended_x = self.attention(x)
         x = self.norm1(x + attended_x)
-?
+
         ff_output = self.feedforward(x)
         x = self.norm2(x + ff_output) # Add the input of the block to its output, then normalize
 
