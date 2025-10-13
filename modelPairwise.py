@@ -24,40 +24,31 @@ def prepare_graph_data(adata, mlb, positional_encodings, parsed_labels):
     print("--- Step 1: Preparing graph data ---")
     
     # --- Input A: Node Features (The Phenotype) ---
-    # We use the PCA data as the initial description of each cell.
     node_features = torch.tensor(adata.obsm['X_pca'], dtype=torch.float32)
     print(f"Node features created with shape: {node_features.shape}")
 
     # --- Graph Structure ---
-    # Convert the SciPy sparse connectivities matrix to PyG's edge_index format.
     # edge_index has shape [2, num_edges] and lists all connections.
     connectivities_matrix = adata.obsp['connectivities']
     edge_index, edge_weight_conn = from_scipy_sparse_matrix(connectivities_matrix)
     print(f"Graph structure created with {edge_index.shape[1]} edges.")
 
     # --- Input B: Edge Features (Merging Graph + Position) ---
-    # This is where we build the "pair-wise feature graph".
     print("Constructing edge features by merging positional, distance, and connectivity data...")
     
-    # Get the source and target node for each edge
     source_nodes, target_nodes = edge_index[0], edge_index[1]
     
-    # Get the positional encodings for all cells
     pert_pos_features = positional_encodings
     
-    # Look up the positional features for the source and target of each edge
     pos_i = pert_pos_features[source_nodes]
     pos_j = pert_pos_features[target_nodes]
     
-    # Get the distance values for each edge from the distances matrix
     distances_matrix = adata.obsp['distances']
     dist_ij = distances_matrix[source_nodes.tolist(), target_nodes.tolist()].A1
     dist_ij = torch.tensor(dist_ij, dtype=torch.float32).unsqueeze(1)
     
-    # Get the connectivity values for each edge (we already have this from the conversion)
     conn_ij = edge_weight_conn.unsqueeze(1)
     
-    # Concatenate everything to create the final edge feature matrix
     edge_attr = torch.cat([
         torch.tensor(pos_i, dtype=torch.float32),
         torch.tensor(pos_j, dtype=torch.float32),
@@ -66,13 +57,10 @@ def prepare_graph_data(adata, mlb, positional_encodings, parsed_labels):
     ], dim=1)
     print(f"Edge features created with shape: {edge_attr.shape}")
     
-    # --- Labels ---
     labels = torch.tensor(mlb.transform(parsed_labels), dtype=torch.float32)
 
-    # --- Create the final PyG Data object ---
     graph_data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=labels)
     
-    # Create masks for training, validation, and testing
     num_nodes = adata.n_obs
     indices = np.arange(num_nodes)
     np.random.shuffle(indices)

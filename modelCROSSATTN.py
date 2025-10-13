@@ -17,7 +17,6 @@ from sklearn.metrics import f1_score
 
 
 # --- 1. The Custom Dataset for Multi-Modal Input ---
-# This is the memory-safe way to handle large, multiple-input data.
 
 class PerturbationMultiModalDataset(Dataset):
     """
@@ -60,7 +59,6 @@ class MultiModalCrossAttentionModel(nn.Module):
         self.embed_dim = embed_dim
 
         # --- Expression Tower (Encoder for gene expression) ---
-        # A simple MLP to learn a dense representation from the sparse gene data.
         self.expression_encoder = nn.Sequential(
             nn.Linear(n_genes, 256),
             nn.ReLU(),
@@ -69,11 +67,9 @@ class MultiModalCrossAttentionModel(nn.Module):
         )
 
         # --- Positional Tower (Encoder for perturbation location) ---
-        # A simple linear layer to project the positional data to the same embedding space.
         self.positional_encoder = nn.Linear(n_positional_features, embed_dim)
 
         # --- Fusion Layer (Cross-Attention) ---
-        # This is where the two modalities "talk" to each other.
         self.cross_attention = nn.MultiheadAttention(
             embed_dim=embed_dim, 
             num_heads=n_heads, 
@@ -85,7 +81,6 @@ class MultiModalCrossAttentionModel(nn.Module):
         self.norm1 = nn.LayerNorm(embed_dim)
         
         # --- Final Prediction Head ---
-        # An MLP that takes the fused representation and makes the final prediction.
         self.prediction_head = nn.Sequential(
             nn.Linear(embed_dim, 64),
             nn.ReLU(),
@@ -101,19 +96,14 @@ class MultiModalCrossAttentionModel(nn.Module):
         pos_embedding = self.positional_encoder(position_input)   # Shape: (batch_size, embed_dim)
         
         # 2. Prepare inputs for the cross-attention layer.
-        # MultiheadAttention expects shape (sequence_length, batch_size, embed_dim).
-        # Since we have one vector per cell, our sequence_length is 1.
-        # We use .unsqueeze(0) to add this dimension.
         query = expr_embedding.unsqueeze(0)    # Shape: (1, batch_size, embed_dim)
         key = pos_embedding.unsqueeze(0)       # Shape: (1, batch_size, embed_dim)
         value = pos_embedding.unsqueeze(0)     # Shape: (1, batch_size, embed_dim)
 
         # 3. Perform cross-attention.
-        # The expression embedding "queries" the positional embedding for relevant info.
         attn_output, _ = self.cross_attention(query=query, key=key, value=value)
         
         # 4. Apply the "Add & Norm" step.
-        # Add the original query (a residual connection) and then apply LayerNorm.
         fused_embedding = self.norm1(query + attn_output)
         
         # 5. Remove the sequence length dimension for the prediction head.
@@ -124,6 +114,7 @@ class MultiModalCrossAttentionModel(nn.Module):
         
         return logits
 
+'''
 # --- 3. Full Training Script ---
 
 # This is a placeholder for where you would load your data.
@@ -210,3 +201,4 @@ try:
 except NameError:
     print("\nPlaceholder section: 'adata' object not found.")
     print("In your real notebook, this script would run the full training process.")
+'''
