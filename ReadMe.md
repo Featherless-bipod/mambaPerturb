@@ -16,7 +16,7 @@ for example, in cancer transcriptomes where multiple mutations may underlie obse
 ---
 ## Results:
 Utilizing a corss-attention based mechanism inserting phenotype and positional data, an F1 score of 0.9225 was reached:
-<img src="data/graphs/cross-attn-f1.png" alt="Training Vs Validation F1 Score Over Time" width="400"/>
+<img src="data/graphs/cross-attn-f1.png" alt="Training Vs Validation F1 Score Over Time" width="600"/>
 ---
 
 
