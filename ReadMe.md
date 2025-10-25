@@ -38,8 +38,14 @@ Cross-attention was chosen over other models because it delivered superior perfo
 
 ---
 ## Results:
+
 Utilizing a cross-attention based mechanism inserting phenotype and positional data, a training F1 score of 0.9225 was reached:
-<img src="data/graphs/cross-attn-f1.png" alt="Training Vs Validation F1 Score Over Time" width="600"/>
+<img src="data/graphs/cross-attn-f1.png" alt="Training Vs Validation F1 Score Over Time" width="800"/>
+
+However, a new benchmarking paper from Alhmann-Eltz showed a benchmarking method, of which when implemented, showed quite unfavorable validation results (validation sets are made purely from double perturbations):
+
+<img src="data/graphs/cross-attn-f2.png" alt="Training Vs Validation F1 Score Over Time" width="800"/>
+
 ---
 
 
