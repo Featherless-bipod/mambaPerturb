@@ -8,15 +8,14 @@ from sklearn.metrics import f1_score
 import numpy as np
 import pandas as pd
 import time
-import modelMLP 
 import matplotlib.pyplot as plt
 from IPython.display import display, clear_output
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
+from tqdm import tqdm
+import functions as fun
 
-
-# --- 1. The Custom Dataset for Multi-Modal Input ---
 
 class PerturbationMultiModalDataset(Dataset):
     """
@@ -113,63 +112,27 @@ class MultiModalCrossAttentionModel(nn.Module):
         logits = self.prediction_head(fused_embedding) # Shape: (batch_size, n_classes)
         
         return logits
-
-'''
-# --- 3. Full Training Script ---
-
-# This is a placeholder for where you would load your data.
-# In your notebook, 'adata', 'labels_int', and 'X_pert_pos' should already be defined.
-# For example:
-# import scanpy as sc
-# adata = sc.read_h5ad("path/to/your/data.h5ad")
-# labels_int = ... # From MultiLabelBinarizer
-# X_pert_pos = ... # From the per-cell positional encoding script
-
-# --- Create instances of your data ---
-# This assumes the variables adata, labels_int, and X_pert_pos exist
-try:
-    expression_data = adata.X
-    positional_data = adata.obsm['X_pert_pos']
     
-    # --- Create the full dataset object ---
-    full_dataset = PerturbationMultiModalDataset(expression_data, positional_data, labels_int)
+def train(model, train_loader, test_loader, optimizer, criterion, num_epochs):
+    # --- 1. Initialization for Plotting ---
+    # Create lists to store the history of metrics
+    train_losses,val_losses = [],[]
+    train_f1_scores,val_f1_scores = [], []
+    all_acc1_scores, all_acc5_scores = [],[]
 
-    # --- Split indices for training and validation ---
-    train_indices, test_indices = train_test_split(
-        range(len(full_dataset)), 
-        test_size=0.2, 
-        random_state=67
-    )
-    train_dataset = Subset(full_dataset, train_indices)
-    test_dataset = Subset(full_dataset, test_indices)
+    # Create a figure and axes for the plots
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 6))
+    # Initially display the empty figure
+    display(fig)
 
-    # --- Create DataLoaders ---
-    batch_size = 32 # You might need to adjust this based on GPU memory
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    # --- Define Hyperparameters and Instantiate Model ---
-    model = MultiModalCrossAttentionModel(
-        n_genes=adata.n_vars,
-        n_positional_features=positional_data.shape[1],
-        n_classes=labels_int.shape[1],
-        embed_dim=128,
-        n_heads=8,
-        dropout=0.2
-    )
-    
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
-    num_epochs = 50
-
-    # --- Training and Evaluation Loop ---
-    print("\nStarting training of the Multi-Modal Cross-Attention Model...")
+    print("\nStarting training with live plotting...")
     for epoch in range(num_epochs):
+        # --- Training Phase ---
         model.train()
         total_train_loss = 0
-        for (expression, position), labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Train]"):
+        # Use tqdm for a progress bar on the training data
+        for (expression, position), labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Train]", leave=False):
             optimizer.zero_grad()
-            
             # The model's forward pass now takes two inputs
             outputs = model(expression, position)
             
@@ -177,28 +140,70 @@ try:
             loss.backward()
             optimizer.step()
             total_train_loss += loss.item()
-        
+            
         avg_train_loss = total_train_loss / len(train_loader)
+        train_losses.append(avg_train_loss)
 
-        # Validation
+        # --- Evaluation Phase ---
         model.eval()
-        all_test_preds, all_test_labels = [], []
-        total_test_loss = 0
+        all_val_preds, all_val_labels = [], []
+        all_train_preds, all_train_labels = [], []
+        all_acc1, all_acc5 = [],[]
+        total_val_loss = 0
+        
         with torch.no_grad():
-            for (expression, position), labels in tqdm(test_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
+            # Get validation metrics
+            for (expression, position), labels in tqdm(test_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]", leave=False):
                 outputs = model(expression, position)
                 loss = criterion(outputs, labels)
-                total_test_loss += loss.item()
+                total_val_loss += loss.item()
+                
                 preds = (torch.sigmoid(outputs) > 0.5).float()
-                all_test_preds.append(preds.cpu().numpy())
-                all_test_labels.append(labels.cpu().numpy())
-        
-        avg_test_loss = total_test_loss / len(test_loader)
-        val_f1 = f1_score(np.vstack(all_test_labels), np.vstack(all_test_preds), average='micro')
-        
-        print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_test_loss:.4f} | Val F1: {val_f1:.4f}")
+                all_val_preds.append(preds.cpu().numpy())
+                all_val_labels.append(labels.cpu().numpy())
 
-except NameError:
-    print("\nPlaceholder section: 'adata' object not found.")
-    print("In your real notebook, this script would run the full training process.")
-'''
+                '''if labels.dim() == 2:
+                    labels = labels.argmax(dim=1)
+
+                acc1 = topk_accuracy(outputs,labels, k=1)
+                acc5 = topk_accuracy(outputs,labels, k=5)
+                
+                all_acc1.append(acc1)
+                all_acc5.append(acc5)'''
+
+
+            # Also get training metrics for comparison (important for diagnosing overfitting)
+            for (expression, position), labels in train_loader:
+                outputs = model(expression, position)
+
+                '''if labels.dim() == 2:
+                    labels = labels.argmax(dim=1)
+                '''
+                preds = (torch.sigmoid(outputs) > 0.5).float()
+                all_train_preds.append(preds.cpu().numpy())
+                all_train_labels.append(labels.cpu().numpy())
+
+
+
+        avg_val_loss = total_val_loss / len(test_loader)
+        val_losses.append(avg_val_loss)
+
+
+        train_f1 = f1_score(np.vstack(all_train_labels), np.vstack(all_train_preds), average='micro')
+        val_f1 = f1_score(np.vstack(all_val_labels), np.vstack(all_val_preds), average='micro')
+
+        train_f1_scores.append(train_f1)
+        val_f1_scores.append(val_f1)
+        '''all_acc1_scores.append(acc1)
+        all_acc5_scores.append(acc5)'''
+
+        fun.plot(fig, ax1, ax2, ax3, train_losses, val_losses, train_f1_scores, val_f1_scores)
+
+        # Print a summary for the current epoch
+        print(f"Epoch {epoch+1}/{num_epochs} | "
+        f"Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | "
+        f"Train F1: {train_f1:.4f} | Val F1: {val_f1:.4f} ")
+
+    # --- 3. Cleanup after the loop is done ---
+    plt.close(fig)
+    print(f"\nTraining Complete. Final Validation F1 Score: {val_f1_scores[-1]:.4f}")
